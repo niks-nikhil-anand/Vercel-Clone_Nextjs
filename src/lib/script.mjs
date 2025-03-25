@@ -35,7 +35,8 @@ async function init() {
 
     console.log("Uploading Files to S3");
 
-    for (const filePath of files) {
+    for (const file of files) {
+      const filePath = path.join(distFolderPath, file);
       if (fs.lstatSync(filePath).isDirectory()) continue;
 
       const command = new PutObjectCommand({
@@ -51,6 +52,5 @@ async function init() {
     console.log("Upload Complete");
   });
 }
-
 
 init();
