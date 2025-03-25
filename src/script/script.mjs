@@ -33,17 +33,21 @@ async function init() {
     const distFolderPath = path.join(outDirPath, "output", "dist");
     const files = fs.readdirSync(distFolderPath, { recursive: true });
 
+    console.log("Uploading Files to S3");
+
     for (const filePath of files) {
       if (fs.lstatSync(filePath).isDirectory()) continue;
 
       const command = new PutObjectCommand({
-        Bucket: "",
+        Bucket: "outputs-vercelniks",
         Key: `__outputs/${project_id}/${filePath}`,
         Body: createReadStream(filePath),
         ContentType: mime.lookup(filePath),
       });
 
       await S3Client.send(command);
+      console.log(`Uploaded ${filePath}`);
     }
+    console.log("Upload Complete");
   });
 }
