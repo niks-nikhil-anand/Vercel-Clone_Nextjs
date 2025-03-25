@@ -11,9 +11,15 @@ RUN apt-get install git -y
 WORKDIR /home/app
 
 COPY src/script/main.sh main.sh
+COPY src/srcipt/script.mjs script.mjs
+COPY package.json .
+
+RUN npm install
 
 # Make sure main.sh is executable 
 RUN chmod +x /home/app/main.sh 
+RUN chmod +x /home/app/script.mjs
+
 
 
 

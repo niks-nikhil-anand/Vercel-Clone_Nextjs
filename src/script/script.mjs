@@ -51,3 +51,6 @@ async function init() {
     console.log("Upload Complete");
   });
 }
+
+
+init();
