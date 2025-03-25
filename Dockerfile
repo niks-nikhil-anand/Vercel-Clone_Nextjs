@@ -7,12 +7,12 @@ RUN apt-get upgrade -y
 RUN apt-get install -y nodejs
 RUN apt-get install git -y
 
-
+# setting the working directory
 WORKDIR /home/app
 
 COPY src/script/main.sh main.sh
 
-# Make sure main.sh is executable
+# Make sure main.sh is executable 
 RUN chmod +x /home/app/main.sh 
 
 
