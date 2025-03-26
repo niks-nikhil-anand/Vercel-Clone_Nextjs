@@ -1,16 +1,36 @@
+import "dotenv/config";
 import { exec } from "child_process";
 import path from "path";
 import fs, { createReadStream } from "fs";
-import { S3Client, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import mine from "mime-types";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import mime from "mime-types";
+import { fileURLToPath } from "url"; 
 
-const S3Client = new S3Client({
+
+
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables
+const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, PROJECT_ID, BUCKET_NAME } = process.env;
+
+// Validate environment variables
+if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !PROJECT_ID || !BUCKET_NAME) {
+  console.error("Missing required environment variables!");
+  process.exit(1);
+}
+
+const s3 = new S3Client({
   region: "ap-south-1",
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    accessKeyId:process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey:process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
+
+
 
 const project_id = process.env.PROJECT_ID;
 const bucket_name = process.env.BUCKET_NAME;
@@ -18,20 +38,21 @@ const bucket_name = process.env.BUCKET_NAME;
 async function init() {
   console.log("Executing Script.js .......");
   const outDirPath = path.join(__dirname, "output");
-  const p = exec(`cd ${outDirPath} && npm install && npm run build`);
 
-  p.stdout.on("data", function (data) {
-    console.log(data);
-  });
+  const p = exec(`npm install && npm run build`, { cwd: outDirPath });
 
-  p.stdout.on("error", function (data) {
-    console.log(`Error: ${data}`);
-  });
+  p.stdout.on("data", (data) => console.log(data));
+  p.stderr.on("data", (data) => console.error(`Error: ${data}`));
 
-  p.on("close", async function (data) {
-    console.log(`Build Complete ${data}`);
-    const distFolderPath = path.join(outDirPath, "output", "dist");
-    const files = fs.readdirSync(distFolderPath, { recursive: true });
+  p.on("close", async (code) => {
+    console.log(`Build Complete with code: ${code}`);
+    if (code !== 0) {
+      console.error("Build failed!");
+      return;
+    }
+
+    const distFolderPath = path.join(outDirPath, "dist");
+    const files = fs.readdirSync(distFolderPath);
 
     console.log("Uploading Files to S3");
 
@@ -39,16 +60,22 @@ async function init() {
       const filePath = path.join(distFolderPath, file);
       if (fs.lstatSync(filePath).isDirectory()) continue;
 
+      const key = `__outputs/${project_id}/${file}`;
       const command = new PutObjectCommand({
-        Bucket: "outputs-vercelniks",
-        Key: `__outputs/${project_id}/${filePath}`,
+        Bucket: bucket_name,
+        Key: key,
         Body: createReadStream(filePath),
-        ContentType: mime.lookup(filePath),
+        ContentType: mime.lookup(filePath) || "application/octet-stream",
       });
 
-      await S3Client.send(command);
-      console.log(`Uploaded ${filePath}`);
+      try {
+        await s3.send(command);
+        console.log(`Uploaded ${file} to S3`);
+      } catch (error) {
+        console.error(`Failed to upload ${file}:`, error);
+      }
     }
+
     console.log("Upload Complete");
   });
 }
