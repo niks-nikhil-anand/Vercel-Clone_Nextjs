@@ -12,12 +12,10 @@ const __dirname = path.dirname(__filename);
 // Load environment variables
 const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, PROJECT_ID, BUCKET_NAME } = process.env;
 
-// Debug: Check if environment variables are loaded
 console.log("AWS Access Key:", AWS_ACCESS_KEY_ID ? "Loaded" : "Missing");
 console.log("AWS Secret Key:", AWS_SECRET_ACCESS_KEY ? "Loaded" : "Missing");
 console.log("S3 Bucket:", BUCKET_NAME);
 
-// Validate environment variables
 if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !PROJECT_ID || !BUCKET_NAME) {
   console.error("Missing required environment variables!");
   process.exit(1);
@@ -34,7 +32,7 @@ const s3 = new S3Client({
 const project_id = PROJECT_ID;
 const bucket_name = BUCKET_NAME;
 
-async function uploadFilesRecursively(directoryPath, project_id) {
+async function uploadFilesRecursively(directoryPath, project_id, basePath = directoryPath) {
   const files = fs.readdirSync(directoryPath);
 
   for (const file of files) {
@@ -42,11 +40,21 @@ async function uploadFilesRecursively(directoryPath, project_id) {
     const stat = fs.lstatSync(filePath);
 
     if (stat.isDirectory()) {
-      // Recursively upload files from the directory
-      await uploadFilesRecursively(filePath, project_id);
+      await uploadFilesRecursively(filePath, project_id, basePath);
     } else {
-      // Upload file to S3
-      const key = `__outputs/${project_id}/${path.relative(directoryPath, filePath)}`;
+      let relativePath = path.relative(basePath, filePath);
+      let key = "";
+
+      if (file === "index.html") {
+        key = `__outputs/${project_id}/index.html`; // Place index.html in __outputs/{project_id}
+      } else {
+        // Ensure `assets/` does not get duplicated
+        if (relativePath.startsWith("assets/")) {
+          relativePath = relativePath.replace(/^assets\//, "");
+        }
+        key = `assets/${relativePath}`; // All other files go inside assets/
+      }
+
       console.log(`Uploading: ${filePath} → S3 Key: ${key}`);
 
       const command = new PutObjectCommand({
